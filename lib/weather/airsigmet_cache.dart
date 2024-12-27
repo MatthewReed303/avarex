@@ -14,8 +14,11 @@ class AirSigmetCache extends WeatherCache {
   AirSigmetCache(super.url, super.dbCall);
 
   @override
-  Future<void> parse(Uint8List data, [String? argument]) async {
-    final List<int> decodedData = GZipCodec().decode(data);
+  Future<void> parse(List<Uint8List> data, [String? argument]) async {
+    if(data.isEmpty) {
+      return;
+    }
+    final List<int> decodedData = GZipCodec().decode(data[0]);
 
     List<AirSigmet> airSigmet = [];
     String decoded = utf8.decode(decodedData, allowMalformed: true);

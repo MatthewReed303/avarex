@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 // put all singletons here.
 
 import 'package:avaremp/area.dart';
-import 'package:avaremp/constants.dart';
 import 'package:avaremp/data/main_database_helper.dart';
 import 'package:avaremp/download_screen.dart';
 import 'package:avaremp/flight_status.dart';
@@ -51,6 +50,7 @@ import 'package:avaremp/destination/destination.dart';
 import 'download_manager.dart';
 import 'flight_timer.dart';
 import 'gdl90/message.dart';
+import 'geojson_parser.dart';
 import 'gps.dart';
 import 'image_utils.dart';
 import 'nmea/nmea_buffer.dart';
@@ -73,7 +73,6 @@ class Storage {
   final plateChange = ValueNotifier<int>(0);
   // when destination changes
   final timeChange = ValueNotifier<int>(0);
-  final flightStateChange = ValueNotifier<int>(0);
   final warningChange = ValueNotifier<bool>(false);
   final flightStatus = FlightStatus();
   late WindsCache winds;
@@ -96,6 +95,7 @@ class Storage {
   Destination? plateAirportDestination;
   late UnitConversion units;
   DownloadManager downloadManager = DownloadManager();
+  GeoJsonParser geoParser = GeoJsonParser();
 
   List<bool> activeChecklistSteps = [];
   String activeChecklistName = "";
@@ -163,7 +163,7 @@ class Storage {
   StreamSubscription<Uint8List>? _udpStream;
 
   void startIO() {
-    
+
     // GPS data receive
     // start both external and internal
     if(!gpsDisabled) {
@@ -172,9 +172,7 @@ class Storage {
       _gpsStream?.onError((obj) {});
       _gpsStream?.onData((data) {
         if (gpsInternal) {
-          _lastMsGpsSignal = DateTime
-              .now()
-              .millisecondsSinceEpoch; // update time when GPS signal was last received
+          _lastMsGpsSignal = DateTime.now().millisecondsSinceEpoch; // update time when GPS signal was last received
           _gpsStack.push(data);
           tracks.add(data);
         } // provide internal GPS when external is not available
@@ -316,12 +314,8 @@ class Storage {
     airep = WeatherCache.make(AirepCache) as AirepCache;
     airSigmet = WeatherCache.make(AirSigmetCache) as AirSigmetCache;
     notam = WeatherCache.make(NotamCache) as NotamCache;
-    winds.download();
-    metar.download();
-    taf.download();
-    tfr.download();
-    airep.download();
-    airSigmet.download();
+
+    area.update(position);
 
     gpsNotPermitted = await Gps().isPermissionDenied();
     if(gpsNotPermitted) {
@@ -336,11 +330,12 @@ class Storage {
       // this provides time to apps
       timeChange.value++;
 
-      position = _gpsStack.pop();
+      Position positionIn = _gpsStack.pop(); // used for testing and injecting GPS location
+      position = Gps.clone(positionIn, area.geoAltitude);
       gpsChange.value = position; // tell everyone
 
-      // auto switch to airport diagram on landing
-      flightStateChange.value = flightStatus.update(position.speed);
+      // update flight status
+      flightStatus.update(position.speed);
 
       route.update(); // change to route
       int now = DateTime.now().millisecondsSinceEpoch;
@@ -378,18 +373,22 @@ class Storage {
           warningChange.value = gpsNoLock || dataExpired || chartsMissing;
         }
       }
-
-      if((timeChange.value % (Constants.weatherUpdateTimeMin * 60)) == 0) {
-        winds.download();
-        metar.download();
-        taf.download();
-        tfr.download();
-        airep.download();
-        airSigmet.download();
-        // nexrad update
-      }
-      // check GPS enabled
     });
+
+    // weather download timer
+    downloadWeather();
+    Timer.periodic(const Duration(minutes: 10), (tim) async {
+      await downloadWeather();
+    });
+  }
+
+  Future<void> downloadWeather() async {
+    winds.download();
+    metar.download();
+    taf.download();
+    tfr.download();
+    airep.download();
+    airSigmet.download();
   }
 
   Future<void> checkDataExpiry() async {

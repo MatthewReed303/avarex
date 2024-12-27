@@ -1,5 +1,7 @@
+import 'package:avaremp/plan/plan_action_screen.dart';
 import 'package:avaremp/storage.dart';
 import 'package:avaremp/wnb_screen.dart';
+import 'package:avaremp/writing_screen.dart';
 import 'package:flutter/material.dart';
 import 'aircraft_screen.dart';
 import 'checklist_screen.dart';
@@ -28,6 +30,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeData>(
+<<<<<<< HEAD
       valueListenable: Storage().themeNotifier,
       builder: (context, value, child) {
         return MaterialApp(
@@ -47,5 +50,29 @@ class MainApp extends StatelessWidget {
         );
       },
     );
+=======
+        valueListenable: Storage().themeNotifier,
+        builder: (context, value, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            initialRoute: '/',
+            routes: {
+              '/': (context) =>
+              Storage().settings.showIntro()
+                  ? const OnBoardingScreen()
+                  : const MainScreen(),
+              '/download': (context) => const DownloadScreen(),
+              '/documents': (context) => const DocumentsScreen(),
+              '/aircraft': (context) => const AircraftScreen(),
+              '/checklists': (context) => const ChecklistScreen(),
+              '/wnb': (context) => const WnbScreen(),
+              '/notes': (context) => const WritingScreen(),
+              '/plan_actions': (context) => const PlanActionScreen(),
+            },
+            theme: value,
+          );
+        });
+    }
+>>>>>>> be6c0fa7b1ea651d7632c1f48e6b2e8c4d405940
   }
 }

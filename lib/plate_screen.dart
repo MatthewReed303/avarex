@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:avaremp/data/user_database_helper.dart';
 import 'package:avaremp/destination/destination.dart';
-import 'package:avaremp/flight_status.dart';
 import 'package:avaremp/geo_calculations.dart';
 import 'package:avaremp/path_utils.dart';
 import 'package:avaremp/storage.dart';
@@ -31,21 +30,7 @@ class PlatesFuture {
   AirportDestination? _airportDestination;
   String _currentPlateAirport = Storage().settings.getCurrentPlateAirport();
 
-  Future<void> _getAll(landed) async {
-    if(landed) {
-      // on landing, add to recent the airport we landed at, then set it as current airport
-      List<Destination> airports = await MainDatabaseHelper.db
-          .findNearestAirportsWithRunways(
-          LatLng(Storage().position.latitude, Storage().position.longitude), 0);
-      if (airports.isNotEmpty) {
-        String? plate = await PathUtils.getAirportDiagram(
-            Storage().dataDir, airports[0].locationID);
-        if (plate != null) {
-          _currentPlateAirport = airports[0].locationID;
-          UserDatabaseHelper.db.addRecent(airports[0]);
-        }
-      }
-    }
+  Future<void> _getAll() async {
 
     // get location ID only
     _airports = (await UserDatabaseHelper.db.getRecentAirports()).map((e) => e.locationID).toList();
@@ -68,8 +53,8 @@ class PlatesFuture {
         .findAirport(Storage().settings.getCurrentPlateAirport());
   }
 
-  Future<PlatesFuture> getAll(bool landed) async {
-    await _getAll(landed);
+  Future<PlatesFuture> getAll() async {
+    await _getAll();
     return this;
   }
 
@@ -93,9 +78,9 @@ class PlateScreenState extends State<PlateScreen> {
   @override
   Widget build(BuildContext context) {
     // this is to listen for landing event, show airport diagram on landing when this screen shows
-    return ValueListenableBuilder(valueListenable: Storage().flightStateChange, builder: (BuildContext context, int value, Widget? child) {
+    return ValueListenableBuilder(valueListenable: Storage().flightStatus.flightStateChange, builder: (BuildContext context, int value, Widget? child) {
       return FutureBuilder(
-        future: PlatesFuture().getAll(value == FlightStatus.flightStateLanded),
+        future: PlatesFuture().getAll(),
         builder: (context, snapshot) {
           if(snapshot.hasData) {
             return _makeContent(snapshot.data);
@@ -202,7 +187,7 @@ class PlateScreenState extends State<PlateScreen> {
                         ),
                         dropdownStyleData: DropdownStyleData(
                           decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
-                          width: Constants.screenWidth(context) / 2,
+                          width: Constants.screenWidth(context) * 0.75,
                         ),
                         isExpanded: false,
                         value: plates.contains(Storage().currentPlate) ? Storage().currentPlate : plates[0],
@@ -304,6 +289,7 @@ class _PlatePainter extends CustomPainter {
   List<double>? _matrix;
   ui.Image? _image;
   ui.Image? _imagePlane;
+  double? _variation;
 
   // Define a paint object
   final _paint = Paint();
@@ -316,12 +302,17 @@ class _PlatePainter extends CustomPainter {
     ..strokeWidth = 6
     ..color = Constants.planeColor;
 
+  final _paintCompass = Paint()
+    ..strokeWidth = 3
+    ..color = Colors.red;
+
   _PlatePainter(ValueNotifier repaint): super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
 
     _image = Storage().imagePlate;
+    _variation = Storage().area.variation;
     _imagePlane = Storage().imagePlane;
     _matrix = Storage().matrixPlate;
     Destination? center = Storage().plateAirportDestination;
@@ -396,6 +387,13 @@ class _PlatePainter extends CustomPainter {
         // draw all based on screen width, height
         _paintLine.shader = ui.Gradient.linear(Offset(0, 2 * (size.height + size.width) / 64), Offset(0, -(size.height + size.width) / 2), [Colors.red, Colors.white]);
         canvas.drawLine(Offset(0, (size.height + size.width) / 64 - _imagePlane!.height), Offset(0, -(size.height + size.width) / 2), _paintLine);
+        double a = (_variation! - 90 - heading - angle) * pi / 180;
+        double x2 = 64 * cos(a);
+        double y2 = 64 * sin(a);
+        double x3 = 54 * cos(a - 0.1);
+        double y3 = 54 * sin(a - 0.1);
+        canvas.drawLine(const Offset(0, 0), Offset(x2, y2), _paintCompass);
+        canvas.drawLine(Offset(x2, y2), Offset(x3, y3), _paintCompass);
         _paintLine.shader = null;
       }
       canvas.restore();

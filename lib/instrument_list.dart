@@ -10,7 +10,6 @@ import 'package:avaremp/weather/winds_cache.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:just_the_tooltip/just_the_tooltip.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'constants.dart';
@@ -83,7 +82,7 @@ class InstrumentListState extends State<InstrumentList> {
       double distance = calculations.calculateDistance(
           position, d.coordinate);
       double bearing = GeoCalculations.getMagneticHeading(calculations.calculateBearing(
-          position, d.coordinate), calculations.getVariation(d.coordinate));
+          position, d.coordinate), d.geoVariation?? 0);
       return (distance, bearing);
     }
     return (0, 0);
@@ -92,7 +91,7 @@ class InstrumentListState extends State<InstrumentList> {
 
   void _gpsListener() {
     // connect to GPS
-    double variation = GeoCalculations().getVariation(Gps.toLatLng(Storage().position));
+    double variation = Storage().area.variation;
     setState(() {
       double q = GeoCalculations.convertSpeed(Storage().position.speed);
       _gndSpeed = _truncate(q.round().toString());
@@ -399,8 +398,6 @@ class InstrumentListState extends State<InstrumentList> {
             ],
           )
         ),
-        const Padding(padding: EdgeInsets.fromLTRB(0, 5, 0, 0)),
-        JustTheTooltip(triggerMode: TooltipTriggerMode.tap, content: const Text("You may hold and drag any box in the top sliding bar to rearrange its position"), child: CircleAvatar(backgroundColor: Constants.bottomNavBarBackgroundColor, radius: 14, child: const Icon(Icons.info_outline)))
       ]),
       buildDefaultDragHandles: false,
       children: <Widget>[

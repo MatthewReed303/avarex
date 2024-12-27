@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:avaremp/data/main_database_helper.dart';
 import 'package:avaremp/data/user_database_helper.dart';
 import 'package:avaremp/geo_calculations.dart';
 import 'package:avaremp/main_screen.dart';
-import 'package:avaremp/path_utils.dart';
 import 'package:avaremp/saa.dart';
 import 'package:avaremp/storage.dart';
+import 'package:avaremp/destination/nav.dart';
 import 'package:avaremp/weather/notam.dart';
 import 'package:avaremp/weather/sounding.dart';
 import 'package:avaremp/weather/taf.dart';
@@ -23,7 +21,6 @@ import 'destination/airport.dart';
 import 'constants.dart';
 import 'package:avaremp/destination/destination.dart';
 import 'weather/metar.dart';
-import 'package:avaremp/destination/nav.dart';
 
 class LongPressWidget extends StatefulWidget {
   final List<Destination> destinations;
@@ -39,7 +36,6 @@ class LongPressFuture {
 
   Destination destination;
   Destination showDestination;
-  Image? airportDiagram;
   int? elevation;
   List<Saa> saa = [];
 
@@ -62,21 +58,19 @@ class LongPressFuture {
 
       elevation = (showDestination as AirportDestination).elevation.round();
 
-      // show first plate
-      String? apd = await PathUtils.getAirportDiagram(Storage().dataDir, showDestination.locationID);
-      if(apd != null) {
-        File file = File(PathUtils.getFilePath(Storage().dataDir, PathUtils.getFilePath(showDestination.locationID, apd)));
-        airportDiagram = Image.file(file);
-      }
-
       pages.add(Airport.parseFrequencies(showDestination as AirportDestination));
 
     }
     else if(showDestination is NavDestination) {
       pages.add(Nav.mainWidget(Nav.parse(showDestination as NavDestination)));
     }
-    else if(showDestination is FixDestination) {
-      pages.add(const Text("Fix"));
+    else if(showDestination is FixDestination || showDestination is GpsDestination) {
+      List<NavDestination> navs = await MainDatabaseHelper.db.findNearestVOR(destination.coordinate);
+      String vors = "${showDestination.type}\n\n";
+      for(NavDestination nav in navs) {
+        vors += "${Nav.getVorLine(nav)}\n";
+      }
+      pages.add(Text(vors));
     }
     else if(showDestination is AirwayDestination) {
       pages.add(const Text(Destination.typeAirway));
@@ -126,20 +120,14 @@ class LongPressWidgetState extends State<LongPressWidget> {
     LatLng ll = LatLng(Storage().position.latitude, Storage().position.longitude);
     double distance = geo.calculateDistance(ll, widget.destinations[0].coordinate);
     double bearing = geo.calculateBearing(ll, widget.destinations[0].coordinate);
-    String direction = ("${distance.round()} ${GeoCalculations.getGeneralDirectionFrom(bearing, geo.getVariation(ll))}");
+    String direction = ("${distance.round()} ${GeoCalculations.getGeneralDirectionFrom(bearing, Storage().area.variation)}");
     String facility = future.showDestination.facilityName.length > 16 ? future.showDestination.facilityName.substring(0, 16) : future.showDestination.facilityName;
     String elevation = future.elevation == null ? "" : " @${future.elevation.toString()}";
     String label = "$facility (${future.showDestination.locationID})$elevation, $direction";
 
     Widget? airportDiagram; // if FAA AD is available show that, otherwise show self made AD
 
-    if(future.airportDiagram != null) {
-      airportDiagram = Center(child: Container(
-          child: future.airportDiagram,
-        ),
-      );
-    }
-    else if (future.showDestination is AirportDestination) {
+    if (future.showDestination is AirportDestination) {
       // made up airport dia
       double width = Constants.screenWidth(context);
       double height = Constants.screenHeight(context);
@@ -177,7 +165,7 @@ class LongPressWidgetState extends State<LongPressWidget> {
           ],
         ));
       }
-      // NOATMS get downloaded on the fly so make this a future.
+      // NOTAMS get downloaded on the fly so make this a future.
       notamPage = future.pages.length;
       future.pages.add(FutureBuilder(future: Storage().notam.getSync(future.showDestination.locationID),
           builder: (context, snapshot) {

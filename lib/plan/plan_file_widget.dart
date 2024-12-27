@@ -48,7 +48,7 @@ class PlanFileWidgetState extends State<PlanFileWidget> {
   String _remarks = "";
 
   bool _sending = false;
-  String _error = "Using 1800wxbrief.com account '${Storage().settings.getEmail()}'";
+  String _error = Storage().settings.getEmail().isEmpty ? "Set 1800wxbrief.com account in the app introduction screen." : "Using 1800wxbrief.com account '${Storage().settings.getEmail()}'";
   Color? _errorColor;
   List<Aircraft>? _aircraft;
 
@@ -292,7 +292,7 @@ class PlanFileWidgetState extends State<PlanFileWidget> {
                 setState(() {
                   if(length > 0) {
                     Destination departure = route.getWaypointAt(0).destination;
-                    if (departure is AirportDestination) {
+                    if (Destination.isAirport(departure.type)) {
                       _departure = departure.locationID;
                     }
                   }
@@ -447,7 +447,7 @@ class PlanFileWidgetState extends State<PlanFileWidget> {
                 setState(() {
                   if(length > 1) {
                     Destination destination = route.getWaypointAt(length - 1).destination;
-                    if (destination is AirportDestination) {
+                    if (Destination.isAirport(destination.type)) {
                       _destination = destination.locationID;
                     }
                   }
@@ -677,7 +677,7 @@ class PlanFileWidgetState extends State<PlanFileWidget> {
             },
             child: const Text("Send to FAA"),),
           const Padding(padding: EdgeInsets.fromLTRB(10, 0, 0, 0)),
-          Visibility(visible: _sending, child: const CircularProgressIndicator(),),
+          SizedBox(width: 16, height: 16, child: Visibility(visible: _sending, child: const CircularProgressIndicator(),)),
           const Padding(padding: EdgeInsets.fromLTRB(10, 0, 0, 0)),
           // Show an error and a question mark with error code when error, otherwise show a check mark
           Tooltip(showDuration: const Duration(seconds: 30), triggerMode: TooltipTriggerMode.tap, message: _error, child: _sending ?

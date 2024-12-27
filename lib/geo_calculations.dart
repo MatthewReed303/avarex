@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:avaremp/storage.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:avaremp/geomag-master/lib/geomag.dart';
 
 
 class GeoCalculations {
@@ -14,8 +13,6 @@ class GeoCalculations {
 
   final Distance _distance = const Distance();
   final Distance _haversineDistance = const Distance(calculator: Haversine());
-
-  final GeoMag _mag = GeoMag();
 
   static const double segmentLength = 100; // nm
   static const double earthRadiusConversion = 3440.069; // nm
@@ -65,7 +62,7 @@ class GeoCalculations {
 
 
   static double getMagneticHeading(double heading, double variation) {
-    return (heading + variation + 360) % 360;
+    return (heading - variation + 360) % 360;
   }
 
   static String getGeneralDirectionFrom(double bearingIn, double declination)
@@ -108,7 +105,12 @@ class GeoCalculations {
 
 
   double calculateDistance(LatLng ll1, LatLng ll2) {
-    return Storage().units.mTo * _distance(ll1, ll2);
+    try {
+      return Storage().units.mTo * _distance(ll1, ll2);
+    }
+    catch (e) {
+    }
+    return 12450; //set distance to maximum distance two points can be apart on earth, if calculation failed
   }
 
   /// Fast distance calculation using Haversine formula (slightly < accurate, but fine for small distances, and crazy fast)
@@ -120,10 +122,6 @@ class GeoCalculations {
     double bearing = _distance.bearing(ll1, ll2);
     bearing = bearing < 0 ? bearing + 360 : bearing;
     return bearing;
-  }
-
-  double getVariation(LatLng ll1) {
-    return -_mag.calculate(ll1.latitude, ll1.longitude).dec; // somehow the package sends inverse
   }
 
   LatLng calculateOffset(LatLng from, double distance, double heading) {

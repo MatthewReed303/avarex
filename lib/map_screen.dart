@@ -19,7 +19,6 @@ import 'package:avaremp/weather/tfr.dart';
 import 'package:avaremp/warnings_widget.dart';
 import 'package:avaremp/weather/weather.dart';
 import 'package:avaremp/weather/winds_aloft.dart';
-import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_cache/flutter_map_cache.dart';
@@ -44,6 +43,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class MapScreenState extends State<MapScreen> {
+
+  static const double iconRadius = 18;
 
   StreamController<void>? mapReset; // to reset the radar map
   void resetRadar() {
@@ -112,14 +113,10 @@ class MapScreenState extends State<MapScreen> {
   void _handleEvent(MapEvent mapEvent) {
     if(_controller != null) {
       LatLng center = Gps.toLatLng(Storage().gpsChange.value);
-      LatLng topCenter = _controller!.camera.pointToLatLng(Point(Constants.screenWidth(context) / 2, Constants.screenHeightForInstruments(context) + 16));
+      LatLng topCenter = _controller!.camera.pointToLatLng(Point(Constants.screenWidth(context) / 2, Constants.screenHeightForInstruments(context) + iconRadius));
       String centralDistance = calculations.calculateDistance(center, topCenter).round().toString();
-      if(!_northUp) { // horizontal/vertical distances are not correct in track up
-        tapeNotifier.value = ([topCenter], [centralDistance]);
-        return;
-      }
-      LatLng topLeft = _controller!.camera.pointToLatLng(const Point(16, 0));
-      LatLng bottomLeft = _controller!.camera.pointToLatLng(Point(16, Constants.screenHeight(context)));
+      LatLng topLeft = _controller!.camera.pointToLatLng(const Point(iconRadius, 0));
+      LatLng bottomLeft = _controller!.camera.pointToLatLng(Point(iconRadius, Constants.screenHeight(context)));
       double ticksInLatitude = ((topLeft.latitude - bottomLeft.latitude)).round() / 6;
       if(ticksInLatitude < 0.1) {
         ticksInLatitude = 0.1; // avoid busy loop
@@ -175,8 +172,7 @@ class MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-
-    if(mapReset != null) {
+    if (mapReset != null) {
       mapReset!.close();
     }
     mapReset = StreamController();
@@ -191,9 +187,9 @@ class MapScreenState extends State<MapScreen> {
     );
 
     TileLayer openaipLayer = TileLayer(
-      maxNativeZoom: 16,
-      urlTemplate: "https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=@@___openaip_client_id__@@",
-      tileProvider: CachedTileProvider(store: Storage().openaipCache));
+        maxNativeZoom: 16,
+        urlTemplate: "https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=@@___openaip_client_id__@@",
+        tileProvider: CachedTileProvider(store: Storage().openaipCache));
 
     TileLayer topoLayer = TileLayer(
       maxNativeZoom: 16,
@@ -240,11 +236,17 @@ class MapScreenState extends State<MapScreen> {
 
     // start from known location
     MapOptions opts = MapOptions(
-      initialCenter: LatLng(Storage().settings.getCenterLatitude(), Storage().settings.getCenterLongitude()),
+      initialCenter: LatLng(Storage().settings.getCenterLatitude(),
+          Storage().settings.getCenterLongitude()),
       initialZoom: Storage().settings.getZoom(),
-      minZoom: 2, // this is less crazy
-      maxZoom: 20, // max for USGS
-      interactionOptions: InteractionOptions(flags: _northUp ? InteractiveFlag.all & ~InteractiveFlag.rotate : InteractiveFlag.all),  // no rotation in track up
+      minZoom: 2,
+      // this is less crazy
+      maxZoom: 20,
+      // max for USGS
+      interactionOptions: InteractionOptions(flags: _northUp
+          ? InteractiveFlag.all & ~InteractiveFlag.rotate
+          : InteractiveFlag.all),
+      // no rotation in track up
       initialRotation: Storage().settings.getRotation(),
       backgroundColor: Constants.mapBackgroundColor,
       onLongPress: (tap, point) async {
@@ -253,7 +255,8 @@ class MapScreenState extends State<MapScreen> {
           showDestination(this.context, items);
         });
       },
-      onPointerDown: (PointerDownEvent event, position) { // calculate down pointers here
+      onPointerDown: (PointerDownEvent event,
+          position) { // calculate down pointers here
         _ruler.setPointer(event.pointer, position);
       },
       onMapEvent: (MapEvent mapEvent) {
@@ -270,30 +273,79 @@ class MapScreenState extends State<MapScreen> {
     );
 
     int lIndex = _layers.indexOf('OSM');
-    if(_layersState[lIndex]) {
+    if (_layersState[lIndex]) {
       layers.add(osmLayer);
       layers.add( // OSM attribution
-          Container(padding: EdgeInsets.fromLTRB(0, 0, 0, Constants.screenHeight(context) / 2),
-            child: const RichAttributionWidget(alignment: AttributionAlignment.bottomRight, attributions: [TextSourceAttribution('OpenStreetMap contributors',),],
+          Container(padding: EdgeInsets.fromLTRB(
+              0, 0, 0, Constants.screenHeight(context) / 2),
+            child: const RichAttributionWidget(
+              alignment: AttributionAlignment.bottomRight,
+              attributions: [
+                TextSourceAttribution('OpenStreetMap contributors',),
+              ],
             ),
           ));
     }
     lIndex = _layers.indexOf('Topo');
-    if(_layersState[lIndex]) {
+    if (_layersState[lIndex]) {
       layers.add(topoLayer);
     }
     lIndex = _layers.indexOf('OpenAIP');
-    if(_layersState[lIndex]) {
+    if (_layersState[lIndex]) {
       layers.add(openaipLayer);
       layers.add(
-          Container(padding: EdgeInsets.fromLTRB(0, 0, 0, Constants.screenHeight(context) / 2),
-            child: const RichAttributionWidget(alignment: AttributionAlignment.bottomRight, attributions: [TextSourceAttribution('OpenAIP contributors',),],
+          Container(padding: EdgeInsets.fromLTRB(
+              0, 0, 0, Constants.screenHeight(context) / 2),
+            child: const RichAttributionWidget(
+              alignment: AttributionAlignment.bottomRight,
+              attributions: [TextSourceAttribution('OpenAIP contributors',),],
             ),
           ));
     }
     lIndex = _layers.indexOf('Chart');
-    if(_layersState[lIndex]) {
+    if (_layersState[lIndex]) {
       layers.add(chartLayer);
+    }
+
+    // Custom shapes
+    lIndex = _layers.indexOf('GeoJSON');
+    if(_layersState[lIndex]) {
+      layers.add(ValueListenableBuilder<int>(
+        valueListenable: Storage().geoParser.change,
+        builder: (context, value, _) {
+          return PolygonLayer(polygons: Storage().geoParser.polygons);
+        })
+      );
+
+      layers.add(ValueListenableBuilder<int>(
+          valueListenable: Storage().geoParser.change,
+          builder: (context, value, _) {
+            return MarkerClusterLayerWidget( //cluster them transparent
+                options: MarkerClusterLayerOptions(
+                  markers: Storage().geoParser.markers,
+                  maxClusterRadius: 45,
+                  disableClusteringAtZoom: 15,
+                  size: const Size(40, 40),
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(50),
+                  maxZoom: 20,
+                  builder: (context, markers) {
+                    return Container(
+                      decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.blue.withAlpha(128)),
+                      child: Center(
+                        child: Text(
+                          markers.length.toString(),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    );
+                  },
+                )
+            );
+          })
+      );
     }
 
     int nexradLength = nexradLayer.length;
@@ -981,7 +1033,6 @@ class MapScreenState extends State<MapScreen> {
             double? ws;
             double? wd;
             (wd, ws) = Storage().area.getWind(GeoCalculations.convertAltitude(value.altitude));
-
             return MarkerLayer(
               markers: [
                 Marker( // our position and heading to destination
@@ -1000,6 +1051,12 @@ class MapScreenState extends State<MapScreen> {
                       point: current,
                       child: CustomPaint(painter: WindBarbPainter(ws, wd))
                   ),
+                Marker( // variation
+                    width: 48,
+                    height: 48,
+                    point: current,
+                    child: CustomPaint(painter: NorthPainter(Storage().area.variation))
+                ),
               ],
             );
           },
@@ -1112,7 +1169,7 @@ class MapScreenState extends State<MapScreen> {
                   child: Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
-                          padding: EdgeInsets.fromLTRB(5, 5, 5, Constants.bottomPaddingSize(context)),
+                          padding: EdgeInsets.fromLTRB(5, 5, 5, Constants.bottomPaddingSize(context) + iconRadius * 2 + 10), // buttons under have 5 padding and radius
                           child: TextButton(
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.all(5.0),
@@ -1145,13 +1202,12 @@ class MapScreenState extends State<MapScreen> {
                       )
                   )
               ),
-
               // menus
               Positioned(
                   child: Align(
                       alignment: Alignment.bottomLeft,
                       child: Padding(
-                          padding: EdgeInsets.fromLTRB(5, 5, 5, Constants.bottomPaddingSize(context)),
+                          padding: EdgeInsets.fromLTRB(35, 0, 0, Constants.bottomPaddingSize(context) + iconRadius * 2 + 10),
                           child: Row(children:[
                             // menu
                             TextButton(
@@ -1197,27 +1253,6 @@ class MapScreenState extends State<MapScreen> {
                               ),
                               child: const Text("Menu"),
                             ),
-
-                            // north up
-                            IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _northUp = _northUp ? false : true;
-                                  });
-                                  Storage().settings.setNorthUp(_northUp); // save
-                                },
-                                icon: ValueListenableBuilder<Position>(
-                                    valueListenable: Storage().gpsChange,
-                                    builder: (context, value, _) {
-                                      return CircleAvatar(
-                                          backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
-                                          // in track up, rotate icon
-                                          child: _northUp ? Tooltip(message: "Press to enable track up navigation", child: Icon(MdiIcons.navigation)) :
-                                          Transform.rotate(
-                                              angle: value.heading * pi / 180,
-                                              child: Tooltip(message: "Press to enable North up navigation", child: Icon(MdiIcons.arrowUpThinCircleOutline))));
-                                    }
-                                )),
                           ])
                       )
                   )
@@ -1227,7 +1262,7 @@ class MapScreenState extends State<MapScreen> {
                   child: Align(
                       alignment: Alignment.bottomRight,
                       child: Padding(
-                          padding: EdgeInsets.fromLTRB(5, 5, 5, Constants.bottomPaddingSize(context)),
+                          padding: EdgeInsets.fromLTRB(0, 0, 5, Constants.bottomPaddingSize(context)),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.end, children:[
                               Row(mainAxisAlignment: MainAxisAlignment.end,
@@ -1245,8 +1280,30 @@ class MapScreenState extends State<MapScreen> {
                                         }
                                       });
                                     },
-                                    icon: CircleAvatar(radius: 16, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
-                                      child: Icon(MdiIcons.mathCompass, color: _ruler.color(), ))),
+                                    icon: CircleAvatar(radius: iconRadius, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
+                                      child: Icon(MdiIcons.mathCompass, color: _ruler.color() == Colors.white ? Theme.of(context).colorScheme.primary : Colors.red, ))),
+
+                                  // north up
+                                  IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _northUp = _northUp ? false : true;
+                                        });
+                                        Storage().settings.setNorthUp(_northUp); // save
+                                      },
+                                      icon: ValueListenableBuilder<Position>(
+                                          valueListenable: Storage().gpsChange,
+                                          builder: (context, value, _) {
+                                            return CircleAvatar(
+                                                radius: iconRadius,
+                                                backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
+                                                // in track up, rotate icon
+                                                child: _northUp ? Tooltip(message: "Press to enable track up navigation", child: Icon(MdiIcons.navigation)) :
+                                                Transform.rotate(
+                                                    angle: value.heading * pi / 180,
+                                                    child: Tooltip(message: "Press to enable North up navigation", child: Icon(MdiIcons.arrowUpThinCircleOutline))));
+                                          }
+                                      )),
 
                                   IconButton(
                                     tooltip: "Enable rubber banding",
@@ -1255,13 +1312,23 @@ class MapScreenState extends State<MapScreen> {
                                         Storage().settings.isRubberBanding() ? Storage().settings.setRubberBanding(false) : Storage().settings.setRubberBanding(true);
                                       });
                                     },
-                                    icon: CircleAvatar(radius: 16, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
-                                      child: Icon(MdiIcons.arrowDecisionOutline, color: Storage().settings.isRubberBanding() ? Colors.red : Colors.white,))),
+                                    icon: CircleAvatar(radius: iconRadius, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
+                                      child: Icon(MdiIcons.arrowDecisionOutline, color: Storage().settings.isRubberBanding() ? Colors.red : Theme.of(context).colorScheme.primary))),
+
+                                  IconButton(
+                                      tooltip: "Write a note",
+                                      onPressed: () {
+                                        setState(() {
+                                          Navigator.pushNamed(context, '/notes');
+                                        });
+                                      },
+                                      icon: CircleAvatar(radius: iconRadius, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
+                                          child: Icon(MdiIcons.transcribe))),
 
                                   // switch layers on off
                                   PopupMenuButton( // layer selection
                                     tooltip: "Select the layers to show on the Map screen",
-                                    icon: CircleAvatar(radius: 16, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
+                                    icon: CircleAvatar(radius: iconRadius, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
                                         child: const Icon(Icons.layers)),
                                     initialValue: _layers[0],
                                     itemBuilder: (BuildContext context) =>
@@ -1317,35 +1384,31 @@ class MapScreenState extends State<MapScreen> {
                                           ),)
                                         ),
                                     ),
-                                  ]
-                                ),
-                                // chart select
-                                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                                  DropdownButtonHideUnderline(
-                                    child:DropdownButton2<String>(
-                                      buttonStyleData: ButtonStyleData(
-                                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Theme.of(context).dialogBackgroundColor.withOpacity(0.7)),
-                                      ),
-                                      dropdownStyleData: DropdownStyleData(
-                                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      isExpanded: false,
-                                      value: _type,
-                                      items: _charts.map((String item) {
-                                        return DropdownMenuItem<String>(
-                                            value: item,
-                                            child: Text(item, style: TextStyle(fontSize: Constants.dropDownButtonFontSize))
-                                        );
-                                      }).toList(),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          Storage().settings.setChartType(value ?? _charts[0]);
-                                          _type = Storage().settings.getChartType();
-                                        });
-                                      },
-                                    )
-                                )
-                              ]),
+                                  // switch layers on off
+                                  PopupMenuButton( // layer selection
+                                    tooltip: "Select the chart type",
+                                    icon: CircleAvatar(radius: iconRadius, backgroundColor: Theme.of(context).dialogBackgroundColor.withOpacity(0.7),
+                                      child: const Icon(Icons.photo_library_rounded)),
+                                      initialValue: _type,
+                                      itemBuilder: (BuildContext context) =>
+                                        List.generate(_charts.length, (int index) => PopupMenuItem(child:
+                                          ListTile(
+                                            onTap: () {
+                                              setState(() {
+                                                Navigator.pop(context);
+                                                _type = _charts[index];
+                                                Storage().settings.setChartType(_charts[index]);
+                                              });
+                                            },
+                                            dense: true,
+                                            title: Text(_charts[index]),
+                                            leading: Visibility(visible: _charts[index] == _type, child: const Icon(Icons.check),),
+                                          ),
+                                        ),
+                                      )
+                                  ),
+                                ]
+                              ),
                           ])
                       )
                   )
@@ -1401,7 +1464,7 @@ class ChartTileProvider extends TileProvider {
 // for scale measurement
 class Ruler {
 
-  List<LatLng> _points = [];
+  List<Destination> _points = [];
   bool _measuring = false;
   final change = ValueNotifier<int>(0);
   final GeoCalculations geo = GeoCalculations();
@@ -1417,12 +1480,12 @@ class Ruler {
       return;
     }
 
-    _points.add(position);
+    _points.add(Destination.fromLatLng(position));
     change.value++;
   }
 
   List<LatLng> getPoints() {
-    return _points;
+    return _points.map((e) => e.coordinate).toList();
   }
 
   List<(int, int)> getDistanceBearing() {
@@ -1431,9 +1494,9 @@ class Ruler {
       return ret;
     }
     for(int i = 0; i < _points.length - 1; i++) {
-      double variation = geo.getVariation(_points[i]);
-      double bearing = GeoCalculations.getMagneticHeading(geo.calculateBearing(_points[i], _points[i + 1]), variation);
-      double distance = geo.calculateDistance(_points[i], _points[i + 1]);
+      double variation = _points[i].geoVariation?? 0;
+      double bearing = GeoCalculations.getMagneticHeading(geo.calculateBearing(_points[i].coordinate, _points[i + 1].coordinate), variation);
+      double distance = geo.calculateDistance(_points[i].coordinate, _points[i + 1].coordinate);
       ret.add((distance.round(), bearing.round()));
     }
 
